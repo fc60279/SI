@@ -1,0 +1,8 @@
+mar. 24, 2025 9:43:32 DA TARDE CryptoUtils loadKeyStore
+INFO: Loaded keystore for user: maria
+mar. 24, 2025 9:43:32 DA TARDE CryptoUtils decryptAESKey
+INFO: AES key decrypted successfully
+mar. 24, 2025 9:43:32 DA TARDE CryptoUtils decryptFile
+INFO: File decrypted successfully
+mar. 24, 2025 9:43:32 DA TARDE CryptoUtils writeFile
+INFO: Wrote file: test5.pdf
