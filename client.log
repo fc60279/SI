@@ -1,6 +1,0 @@
-mar. 24, 2025 9:43:32 DA TARDE myCiencias connect
-INFO: Connected to server at 127.0.0.1:23456
-mar. 24, 2025 9:43:32 DA TARDE myCiencias getFiles
-INFO: Requesting file: test5.pdf
-mar. 24, 2025 9:43:32 DA TARDE myCiencias handleEncryptedFile
-INFO: Successfully decrypted file: test5.pdf saved as: test5.pdf
