@@ -193,4 +193,20 @@ public class UserManager {
         addUser(username, password);
         logger.info("User registered successfully: " + username);
     }
+    
+    public void deleteUser(String username) throws Exception {
+        logger.info("Deleting user: " + username);
+        
+        if (!userExists(username)) {
+            throw new IllegalArgumentException("User does not exist");
+        }
+        
+        if (username.equals("admin")) {
+            throw new IllegalArgumentException("Cannot delete admin user");
+        }
+        
+        users.remove(username);
+        saveUsers();
+        logger.info("User deleted successfully: " + username);
+    }
 } 

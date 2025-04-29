@@ -3,6 +3,7 @@ import java.net.*;
 import java.security.*;
 import java.util.logging.*;
 import javax.crypto.SecretKey;
+import javax.net.ssl.*;
 
 public class myCiencias {
     private final String serverAddress;
@@ -12,10 +13,12 @@ public class myCiencias {
     private final String userPassword;
     private final String keystorePassword;
     private final Logger logger;
-    private Socket socket;
+    private SSLSocket socket;
     private DataOutputStream out;
     private DataInputStream in;
     private KeyStore emitterKeyStore;
+    private static final String TRUSTSTORE_PATH = "ssl/truststore.jks";
+    private static final String TRUSTSTORE_PASSWORD = "123456";
 
     public myCiencias(String serverAddress, int serverPort, String emitterUser, String studentUser, String userPassword, String keystorePassword) {
         this.serverAddress = serverAddress;
@@ -52,15 +55,68 @@ public class myCiencias {
     }
 
     private void connect() throws IOException {
-        socket = new Socket(serverAddress, serverPort);
-        out = new DataOutputStream(socket.getOutputStream());
-        in = new DataInputStream(socket.getInputStream());
+        try {
+            // Set up SSL context
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            
+            // Check if truststore exists
+            File trustStoreFile = new File(TRUSTSTORE_PATH);
+            if (!trustStoreFile.exists()) {
+                File directory = new File("ssl");
+                if (!directory.exists()) {
+                    directory.mkdirs();
+                }
+                logger.warning("Truststore not found at: " + TRUSTSTORE_PATH);
+                logger.warning("SSL connection will not verify server certificate");
+                
+                // Create a trust manager that does not validate certificate chains
+                TrustManager[] trustAllCerts = new TrustManager[]{
+                    new X509TrustManager() {
+                        public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                            return null;
+                        }
+                        public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+                        }
+                        public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+                        }
+                    }
+                };
+                
+                sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+            } else {
+                // Load the truststore
+                KeyStore ts = KeyStore.getInstance("JKS");
+                ts.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
+                
+                TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                tmf.init(ts);
+                
+                sslContext.init(null, tmf.getTrustManagers(), null);
+            }
+            
+            // Create SSL socket factory
+            SSLSocketFactory factory = sslContext.getSocketFactory();
+            
+            // Create and configure SSL socket
+            socket = (SSLSocket) factory.createSocket(serverAddress, serverPort);
+            socket.setEnabledProtocols(new String[] {"TLSv1.2", "TLSv1.3"});
+            socket.setUseClientMode(true);
+            socket.startHandshake();
+            
+            logger.info("SSL connection established with server: " + serverAddress + ":" + serverPort);
+            
+            out = new DataOutputStream(socket.getOutputStream());
+            in = new DataInputStream(socket.getInputStream());
 
-        // Authenticate with the server
-        out.writeUTF("LOGIN:" + (emitterUser != null ? emitterUser : studentUser) + ":" + userPassword);
-        String response = in.readUTF();
-        if (!response.startsWith("SUCCESS")) {
-            throw new IOException("Authentication failed: " + response);
+            // Authenticate with the server
+            out.writeUTF("LOGIN:" + (emitterUser != null ? emitterUser : studentUser) + ":" + userPassword);
+            String response = in.readUTF();
+            if (!response.startsWith("SUCCESS")) {
+                throw new IOException("Authentication failed: " + response);
+            }
+        } catch (Exception e) {
+            logger.severe("Failed to establish secure connection: " + e.getMessage());
+            throw new IOException("Failed to establish secure connection: " + e.getMessage(), e);
         }
     }
 
@@ -403,7 +459,52 @@ public class myCiencias {
 
     public static void createUser(String serverAddress, int serverPort, String username, String password) {
         try {
-            Socket socket = new Socket(serverAddress, serverPort);
+            // Set up SSL context
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            
+            // Check if truststore exists
+            File trustStoreFile = new File(TRUSTSTORE_PATH);
+            if (!trustStoreFile.exists()) {
+                File directory = new File("ssl");
+                if (!directory.exists()) {
+                    directory.mkdirs();
+                }
+                System.out.println("Warning: Truststore not found, will not verify server certificate");
+                
+                // Create a trust manager that does not validate certificate chains
+                TrustManager[] trustAllCerts = new TrustManager[]{
+                    new X509TrustManager() {
+                        public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                            return null;
+                        }
+                        public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+                        }
+                        public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+                        }
+                    }
+                };
+                
+                sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+            } else {
+                // Load the truststore
+                KeyStore ts = KeyStore.getInstance("JKS");
+                ts.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
+                
+                TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                tmf.init(ts);
+                
+                sslContext.init(null, tmf.getTrustManagers(), null);
+            }
+            
+            // Create SSL socket factory
+            SSLSocketFactory factory = sslContext.getSocketFactory();
+            
+            // Create and configure SSL socket
+            SSLSocket socket = (SSLSocket) factory.createSocket(serverAddress, serverPort);
+            socket.setEnabledProtocols(new String[] {"TLSv1.2", "TLSv1.3"});
+            socket.setUseClientMode(true);
+            socket.startHandshake();
+            
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
             DataInputStream in = new DataInputStream(socket.getInputStream());
 

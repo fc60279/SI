@@ -1,4 +1,10 @@
-abr. 29, 2025 6:39:12 DA TARDE myCiencias getFiles
+abr. 29, 2025 7:24:41 DA TARDE myCiencias connect
+WARNING: Truststore not found at: ssl/truststore.jks
+abr. 29, 2025 7:24:41 DA TARDE myCiencias connect
+WARNING: SSL connection will not verify server certificate
+abr. 29, 2025 7:24:41 DA TARDE myCiencias connect
+INFO: SSL connection established with server: 127.0.0.1:23456
+abr. 29, 2025 7:24:41 DA TARDE myCiencias getFiles
 INFO: Requesting file: test5.pdf
-abr. 29, 2025 6:39:12 DA TARDE myCiencias handleEncryptedFile
+abr. 29, 2025 7:24:41 DA TARDE myCiencias handleEncryptedFile
 INFO: Successfully decrypted file: test5.pdf saved as: test52.pdf

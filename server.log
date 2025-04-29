@@ -1,14 +1,50 @@
-abr. 29, 2025 6:45:14 DA TARDE myCienciasServer <init>
+abr. 29, 2025 7:23:15 DA TARDE myCienciasServer <init>
 INFO: Initializing user manager with password file integrity check
-abr. 29, 2025 6:45:14 DA TARDE myCienciasServer <init>
+abr. 29, 2025 7:23:17 DA TARDE myCienciasServer <init>
 INFO: User manager initialized successfully
-abr. 29, 2025 6:45:14 DA TARDE myCienciasServer start
-INFO: Server started on port 23456
-abr. 29, 2025 6:45:22 DA TARDE myCienciasServer start
+abr. 29, 2025 7:23:17 DA TARDE myCienciasServer createSSLServerSocket
+INFO: Loading keystore from: /Users/gustavo/Desktop/SIprojeto2/SI/../ssl/server.keystore
+abr. 29, 2025 7:23:17 DA TARDE myCienciasServer createSSLServerSocket
+INFO: SSL server socket created successfully
+abr. 29, 2025 7:23:17 DA TARDE myCienciasServer start
+INFO: Secure server started on port 23456
+abr. 29, 2025 7:23:56 DA TARDE myCienciasServer start
 INFO: New client connected from /127.0.0.1
-abr. 29, 2025 6:45:22 DA TARDE myCienciasServer handleClient
+abr. 29, 2025 7:23:56 DA TARDE myCienciasServer handleClient
 INFO: Received command: REGISTER:Gui:123456
-abr. 29, 2025 6:45:22 DA TARDE myCienciasServer handleClient
+abr. 29, 2025 7:23:56 DA TARDE myCienciasServer handleClient
 INFO: Client disconnected: /127.0.0.1
-abr. 29, 2025 6:45:22 DA TARDE myCienciasServer handleClient
+abr. 29, 2025 7:23:56 DA TARDE myCienciasServer handleClient
+INFO: Client handler finished for: /127.0.0.1
+abr. 29, 2025 7:24:20 DA TARDE myCienciasServer start
+INFO: New client connected from /127.0.0.1
+abr. 29, 2025 7:24:21 DA TARDE myCienciasServer handleClient
+INFO: Received command: LOGIN:silva:123456
+abr. 29, 2025 7:24:21 DA TARDE myCienciasServer handleClient
+INFO: Received command: GET_CERTIFICATE:maria
+abr. 29, 2025 7:24:21 DA TARDE myCienciasServer handleClient
+INFO: Received command: STORE_ENCRYPTED:maria:test5.pdf
+abr. 29, 2025 7:24:21 DA TARDE myCienciasServer handleStoreEncrypted
+INFO: Storing encrypted file for student maria: test5.pdf
+abr. 29, 2025 7:24:21 DA TARDE myCienciasServer handleStoreEncrypted
+INFO: Successfully stored encrypted file: test5.pdf
+abr. 29, 2025 7:24:21 DA TARDE myCienciasServer handleClient
+INFO: Client disconnected: /127.0.0.1
+abr. 29, 2025 7:24:21 DA TARDE myCienciasServer handleClient
+INFO: Client handler finished for: /127.0.0.1
+abr. 29, 2025 7:24:41 DA TARDE myCienciasServer start
+INFO: New client connected from /127.0.0.1
+abr. 29, 2025 7:24:41 DA TARDE myCienciasServer handleClient
+INFO: Received command: LOGIN:maria:123456
+abr. 29, 2025 7:24:41 DA TARDE myCienciasServer handleClient
+INFO: Received command: GET_FILE_INFO:maria:test5.pdf
+abr. 29, 2025 7:24:41 DA TARDE myCienciasServer handleGetFileInfo
+INFO: Getting file info for student maria: test5.pdf
+abr. 29, 2025 7:24:41 DA TARDE myCienciasServer sendEncryptedFile
+INFO: Sending encrypted file to student maria: test5.pdf
+abr. 29, 2025 7:24:41 DA TARDE myCienciasServer sendEncryptedFile
+INFO: Successfully sent encrypted file: test5.pdf
+abr. 29, 2025 7:24:41 DA TARDE myCienciasServer handleClient
+INFO: Client disconnected: /127.0.0.1
+abr. 29, 2025 7:24:41 DA TARDE myCienciasServer handleClient
 INFO: Client handler finished for: /127.0.0.1

@@ -19,14 +19,15 @@ javac *.java
 No Windows:
 ```bash
 setup_keystores.bat
+create_server_keystore.bat
 ```
 
 No Linux/Mac:
 ```bash
 chmod +x setup_keystores.sh
 ./setup_keystores.sh
-------------------------------
-sh setup_keystores.sh
+chmod +x create_server_keystore.sh
+./create_server_keystore.sh
 ```
 
 ## Uso do Servidor
@@ -105,10 +106,22 @@ server_files/
 
 ## Segurança
 
+- Comunicação Cliente-Servidor: SSL/TLS para autenticidade do servidor e confidencialidade
+- Integridade do ficheiro de passwords: MAC (Message Authentication Code)
 - Criptografia assimétrica: RSA com chaves de 2048 bits
 - Criptografia simétrica: AES com chaves de 128 bits
 - Assinaturas digitais: SHA256withRSA
 - Keystores: PKCS12
+
+## Comunicação Segura
+
+O sistema implementa comunicação segura usando o protocolo SSL/TLS:
+
+1. Autenticidade do servidor: O servidor possui um certificado que é verificado pelo cliente
+2. Confidencialidade: Toda a comunicação é cifrada, protegendo contra escutas
+3. Integridade: Os dados transmitidos são protegidos contra alterações
+
+A primeira vez que o cliente se conecta, o certificado do servidor é adicionado ao truststore do cliente.
 
 ## Notas
 

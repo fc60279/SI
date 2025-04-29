@@ -10,15 +10,18 @@ import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import javax.net.ssl.*;
 
 public class myCienciasServer {
     private final int port;
     private final ExecutorService executorService;
     private final Logger logger;
     private volatile boolean running;
-    private ServerSocket serverSocket;
+    private SSLServerSocket serverSocket;
     private final String baseDirectory = "server_files";
     private UserManager userManager = null;
+    private static final String KEYSTORE_PASSWORD = "123456";
+    private static final String KEYSTORE_PATH = "../ssl/server.keystore";
 
     public myCienciasServer(int port) {
         this.port = port;
@@ -76,16 +79,106 @@ public class myCienciasServer {
         return dir;
     }
 
+    private SSLServerSocket createSSLServerSocket() throws Exception {
+        try {
+            // Set up the key manager factory
+            KeyStore ks = KeyStore.getInstance("PKCS12");
+            
+            // Check if keystore exists, if not create it
+            File keyStoreFile = new File(KEYSTORE_PATH);
+            if (!keyStoreFile.exists()) {
+                File directory = new File("../ssl");
+                if (!directory.exists()) {
+                    directory.mkdirs();
+                }
+                
+                // Execute the script to create keystores
+                if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                    logger.info("Creating server keystore using Windows script");
+                    ProcessBuilder pb = new ProcessBuilder("cmd", "/c", "create_server_keystore.bat");
+                    Process p = pb.start();
+                    int exitCode = p.waitFor();
+                    if (exitCode != 0) {
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+                        String line;
+                        StringBuilder error = new StringBuilder();
+                        while ((line = reader.readLine()) != null) {
+                            error.append(line).append("\n");
+                        }
+                        throw new IOException("Failed to create server keystore: " + error.toString());
+                    }
+                } else {
+                    logger.info("Creating server keystore using Unix script");
+                    ProcessBuilder pb = new ProcessBuilder("sh", "create_server_keystore.sh");
+                    Process p = pb.start();
+                    int exitCode = p.waitFor();
+                    if (exitCode != 0) {
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+                        String line;
+                        StringBuilder error = new StringBuilder();
+                        while ((line = reader.readLine()) != null) {
+                            error.append(line).append("\n");
+                        }
+                        throw new IOException("Failed to create server keystore: " + error.toString());
+                    }
+                }
+                
+                // Verificar novamente se o keystore foi criado
+                if (!keyStoreFile.exists()) {
+                    // Tente um caminho alternativo - talvez o script tenha colocado em outro lugar
+                    File altKeyStoreFile = new File("ssl/server.keystore");
+                    if (altKeyStoreFile.exists()) {
+                        logger.info("Found keystore at alternate location: ssl/server.keystore");
+                        keyStoreFile = altKeyStoreFile;
+                    } else {
+                        altKeyStoreFile = new File("server.keystore");
+                        if (altKeyStoreFile.exists()) {
+                            logger.info("Found keystore at alternate location: server.keystore");
+                            keyStoreFile = altKeyStoreFile;
+                        } else {
+                            throw new IOException("Failed to create server keystore");
+                        }
+                    }
+                }
+            }
+            
+            logger.info("Loading keystore from: " + keyStoreFile.getAbsolutePath());
+            ks.load(new FileInputStream(keyStoreFile), KEYSTORE_PASSWORD.toCharArray());
+
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
+
+            // Set up the SSL context
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(kmf.getKeyManagers(), null, null);
+
+            // Create the SSL server socket factory
+            SSLServerSocketFactory ssf = sslContext.getServerSocketFactory();
+            SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port);
+            
+            // Configure SSL properties
+            serverSocket.setEnabledProtocols(new String[] {"TLSv1.2", "TLSv1.3"});
+            serverSocket.setNeedClientAuth(false);
+            serverSocket.setEnableSessionCreation(true);
+            
+            logger.info("SSL server socket created successfully");
+            return serverSocket;
+        } catch (Exception e) {
+            logger.severe("Error creating SSL server socket: " + e.getMessage());
+            throw e;
+        }
+    }
+
     public void start() {
         running = true;
         try {
-            serverSocket = new ServerSocket(port);
-            logger.info("Server started on port " + port);
-            System.out.println("Server started on port " + port);
+            serverSocket = createSSLServerSocket();
+            logger.info("Secure server started on port " + port);
+            System.out.println("Secure server started on port " + port);
             
             while (running) {
                 try {
-                    Socket clientSocket = serverSocket.accept();
+                    SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
                     logger.info("New client connected from " + clientSocket.getInetAddress());
                     executorService.submit(() -> handleClient(clientSocket));
                 } catch (IOException e) {
@@ -94,12 +187,14 @@ public class myCienciasServer {
                     }
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.severe("Error starting server: " + e.getMessage());
+            System.err.println("Error starting server: " + e.getMessage());
+            System.exit(1);
         }
     }
 
-    private void handleClient(Socket clientSocket) {
+    private void handleClient(SSLSocket clientSocket) {
         try (DataInputStream in = new DataInputStream(clientSocket.getInputStream());
              DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream())) {
             
