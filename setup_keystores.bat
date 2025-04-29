@@ -1,33 +1,53 @@
 @echo off
 setlocal
 
+rem Password for all keystores
 set PASS=123456
-set USERS=silva maria joao ana
 
-:: Generate keystores and certificates for each user
-for %%u in (%USERS%) do (
-    echo Generating keystore for %%u...
-    keytool -genkeypair -alias %%u -keyalg RSA -keysize 2048 -dname "CN=%%u" -validity 365 -storetype PKCS12 -keystore %%u.keystore -storepass %PASS% -keypass %PASS%
-    
-    echo Exporting certificate for %%u...
-    keytool -exportcert -alias %%u -file %%u.cer -keystore %%u.keystore -storepass %PASS%
+rem Create certificates directory if it doesn't exist
+if not exist ..\certificates mkdir ..\certificates
+
+rem Create keystores for test users
+for %%u in (silva maria joao ana) do (
+    rem Generate key pair
+    keytool -genkeypair ^
+        -alias %%u ^
+        -keyalg RSA ^
+        -keysize 2048 ^
+        -dname "CN=%%u" ^
+        -validity 365 ^
+        -storetype PKCS12 ^
+        -keystore %%u.keystore ^
+        -storepass %PASS% ^
+        -keypass %PASS%
+
+    rem Export certificate
+    keytool -exportcert ^
+        -alias %%u ^
+        -file %%u.cer ^
+        -keystore %%u.keystore ^
+        -storepass %PASS%
+        
+    rem Copy certificate to the certificates directory
+    copy %%u.cer ..\certificates\
 )
 
-:: Import certificates into other users' keystores
-for %%u in (%USERS%) do (
-    for %%v in (%USERS%) do (
-        if not "%%u"=="%%v" (
-            echo Importing %%v's certificate into %%u's keystore...
-            keytool -importcert -alias %%v -file %%v.cer -keystore %%u.keystore -storepass %PASS% -noprompt
+rem Import certificates into each keystore
+for %%u1 in (silva maria joao ana) do (
+    for %%u2 in (silva maria joao ana) do (
+        if not "%%u1"=="%%u2" (
+            keytool -importcert ^
+                -alias %%u2 ^
+                -file %%u2.cer ^
+                -keystore %%u1.keystore ^
+                -storepass %PASS% ^
+                -noprompt
         )
     )
 )
 
-:: Clean up certificate files
-for %%u in (%USERS%) do (
-    del %%u.cer
-)
+rem Clean up certificates in current directory (but keep them in the certificates directory)
+del *.cer
 
-echo.
-echo Keystores created successfully!
-echo. 
+echo Keystores and certificates created successfully!
+endlocal 

@@ -9,18 +9,21 @@ public class myCiencias {
     private final int serverPort;
     private final String emitterUser;
     private final String studentUser;
+    private final String userPassword;
+    private final String keystorePassword;
     private final Logger logger;
     private Socket socket;
     private DataOutputStream out;
     private DataInputStream in;
     private KeyStore emitterKeyStore;
-    private static final String KEYSTORE_PASSWORD = "123456";
 
-    public myCiencias(String serverAddress, int serverPort, String emitterUser, String studentUser) {
+    public myCiencias(String serverAddress, int serverPort, String emitterUser, String studentUser, String userPassword, String keystorePassword) {
         this.serverAddress = serverAddress;
         this.serverPort = serverPort;
         this.emitterUser = emitterUser;
         this.studentUser = studentUser;
+        this.userPassword = userPassword;
+        this.keystorePassword = keystorePassword;
         this.logger = Logger.getLogger("myCiencias");
         setupLogging();
         if (emitterUser != null) {
@@ -30,7 +33,7 @@ public class myCiencias {
 
     private void loadEmitterKeyStore() {
         try {
-            emitterKeyStore = CryptoUtils.loadKeyStore(emitterUser, KEYSTORE_PASSWORD);
+            emitterKeyStore = CryptoUtils.loadKeyStore(emitterUser, keystorePassword);
         } catch (Exception e) {
             logger.severe("Failed to load emitter keystore: " + e.getMessage());
             System.exit(1);
@@ -52,7 +55,13 @@ public class myCiencias {
         socket = new Socket(serverAddress, serverPort);
         out = new DataOutputStream(socket.getOutputStream());
         in = new DataInputStream(socket.getInputStream());
-        logger.info("Connected to server at " + serverAddress + ":" + serverPort);
+
+        // Authenticate with the server
+        out.writeUTF("LOGIN:" + (emitterUser != null ? emitterUser : studentUser) + ":" + userPassword);
+        String response = in.readUTF();
+        if (!response.startsWith("SUCCESS")) {
+            throw new IOException("Authentication failed: " + response);
+        }
     }
 
     public void encryptAndSendFiles(String[] filenames) {
@@ -60,7 +69,7 @@ public class myCiencias {
             connect();
             
             // Get student's certificate
-            out.writeUTF("GET_CERT:" + studentUser);
+            out.writeUTF("GET_CERTIFICATE:" + studentUser);
             String response = in.readUTF();
             if (!response.startsWith("SUCCESS:")) {
                 throw new Exception("Failed to get student certificate: " + response);
@@ -114,7 +123,7 @@ public class myCiencias {
         try {
             connect();
             
-            PrivateKey privateKey = (PrivateKey) emitterKeyStore.getKey(emitterUser, KEYSTORE_PASSWORD.toCharArray());
+            PrivateKey privateKey = (PrivateKey) emitterKeyStore.getKey(emitterUser, keystorePassword.toCharArray());
             
             for (String filename : filenames) {
                 try {
@@ -154,7 +163,7 @@ public class myCiencias {
             connect();
             
             // Get student's certificate
-            out.writeUTF("GET_CERT:" + studentUser);
+            out.writeUTF("GET_CERTIFICATE:" + studentUser);
             String response = in.readUTF();
             if (!response.startsWith("SUCCESS:")) {
                 throw new Exception("Failed to get student certificate: " + response);
@@ -165,7 +174,7 @@ public class myCiencias {
             java.security.cert.CertificateFactory cf = java.security.cert.CertificateFactory.getInstance("X.509");
             java.security.cert.Certificate cert = cf.generateCertificate(new ByteArrayInputStream(certBytes));
             
-            PrivateKey privateKey = (PrivateKey) emitterKeyStore.getKey(emitterUser, KEYSTORE_PASSWORD.toCharArray());
+            PrivateKey privateKey = (PrivateKey) emitterKeyStore.getKey(emitterUser, keystorePassword.toCharArray());
             
             for (String filename : filenames) {
                 try {
@@ -219,30 +228,7 @@ public class myCiencias {
                 try {
                     logger.info("Requesting file: " + filename);
                     
-                    out.writeUTF("GET_FILE_INFO:" + studentUser + ":" + filename);
-                    String response = in.readUTF();
-                    
-                    if (!response.startsWith("SUCCESS:")) {
-                        throw new Exception("Failed to get file " + filename + ": " + response);
-                    }
-                    
-                    String[] parts = response.substring(8).split(":");
-                    String type = parts[0];
-                    String emitter = parts.length > 1 ? parts[1] : null;
-                    
-                    switch (type) {
-                        case "ENCRYPTED":
-                            handleEncryptedFile(filename);
-                            break;
-                        case "SIGNED":
-                            handleSignedFile(filename, emitter);
-                            break;
-                        case "SECURE":
-                            handleSecureFile(filename, emitter);
-                            break;
-                        default:
-                            throw new Exception("Unknown file type: " + type);
-                    }
+                    getFile(filename);
                 } catch (Exception e) {
                     logger.severe("Error processing file " + filename + ": " + e.getMessage());
                     // Continue with next file
@@ -252,6 +238,33 @@ public class myCiencias {
             logger.severe("Error in getFiles: " + e.getMessage());
         } finally {
             disconnect();
+        }
+    }
+
+    private void getFile(String filename) throws Exception {
+        out.writeUTF("GET_FILE_INFO:" + studentUser + ":" + filename);
+        String response = in.readUTF();
+        
+        if (!response.startsWith("SUCCESS:")) {
+            throw new IOException("Failed to get file " + filename + ": " + response);
+        }
+        
+        String[] parts = response.substring(8).split(":");
+        String type = parts[0];
+        String emitter = parts.length > 1 ? parts[1] : null;
+        
+        switch (type) {
+            case "ENCRYPTED":
+                handleEncryptedFile(filename);
+                break;
+            case "SIGNED":
+                handleSignedFile(filename, emitter);
+                break;
+            case "SECURE":
+                handleSecureFile(filename, emitter);
+                break;
+            default:
+                throw new Exception("Unknown file type: " + type);
         }
     }
 
@@ -267,8 +280,8 @@ public class myCiencias {
         in.readFully(encryptedKey);
         
         // Load student's private key
-        KeyStore studentKeyStore = CryptoUtils.loadKeyStore(studentUser, KEYSTORE_PASSWORD);
-        PrivateKey privateKey = (PrivateKey) studentKeyStore.getKey(studentUser, KEYSTORE_PASSWORD.toCharArray());
+        KeyStore studentKeyStore = CryptoUtils.loadKeyStore(studentUser, keystorePassword);
+        PrivateKey privateKey = (PrivateKey) studentKeyStore.getKey(studentUser, keystorePassword.toCharArray());
         
         // Decrypt AES key and file
         SecretKey aesKey = CryptoUtils.decryptAESKey(encryptedKey, privateKey);
@@ -292,7 +305,7 @@ public class myCiencias {
         in.readFully(signature);
         
         // Load emitter's certificate
-        KeyStore emitterKeyStore = CryptoUtils.loadKeyStore(emitterUser, KEYSTORE_PASSWORD);
+        KeyStore emitterKeyStore = CryptoUtils.loadKeyStore(emitterUser, keystorePassword);
         java.security.cert.Certificate cert = emitterKeyStore.getCertificate(emitterUser);
         
         // Verify signature
@@ -325,15 +338,15 @@ public class myCiencias {
         in.readFully(signature);
         
         // Load student's private key
-        KeyStore studentKeyStore = CryptoUtils.loadKeyStore(studentUser, KEYSTORE_PASSWORD);
-        PrivateKey privateKey = (PrivateKey) studentKeyStore.getKey(studentUser, KEYSTORE_PASSWORD.toCharArray());
+        KeyStore studentKeyStore = CryptoUtils.loadKeyStore(studentUser, keystorePassword);
+        PrivateKey privateKey = (PrivateKey) studentKeyStore.getKey(studentUser, keystorePassword.toCharArray());
         
         // Decrypt AES key and file
         SecretKey aesKey = CryptoUtils.decryptAESKey(encryptedKey, privateKey);
         byte[] fileData = CryptoUtils.decryptFile(encryptedData, aesKey);
         
         // Load emitter's certificate and verify signature
-        KeyStore emitterKeyStore = CryptoUtils.loadKeyStore(emitterUser, KEYSTORE_PASSWORD);
+        KeyStore emitterKeyStore = CryptoUtils.loadKeyStore(emitterUser, keystorePassword);
         java.security.cert.Certificate cert = emitterKeyStore.getCertificate(emitterUser);
         
         boolean valid = CryptoUtils.verifySignature(fileData, signature, cert.getPublicKey());
@@ -388,12 +401,38 @@ public class myCiencias {
         }
     }
 
+    public static void createUser(String serverAddress, int serverPort, String username, String password) {
+        try {
+            Socket socket = new Socket(serverAddress, serverPort);
+            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
+
+            // Send register command
+            out.writeUTF("REGISTER:" + username + ":" + password);
+            String response = in.readUTF();
+            
+            if (!response.startsWith("SUCCESS:")) {
+                System.err.println("Error creating user: " + response);
+                System.exit(1);
+            }
+            
+            System.out.println("User created successfully!");
+            
+            socket.close();
+        } catch (Exception e) {
+            System.err.println("Error creating user: " + e.getMessage());
+            System.exit(1);
+        }
+    }
+
     public static void main(String[] args) {
         if (args.length < 3) {
+            System.out.println("Usage for creating users:");
+            System.out.println("  java myCiencias -a <serverAddress> -n <username> <password>");
             System.out.println("Usage for sending files:");
-            System.out.println("  java myCiencias -a <serverAddress> -u <emitterUser> -e <studentUser> [-c|-s|-b] {<filenames>}+");
+            System.out.println("  java myCiencias -a <serverAddress> -u <emitterUser> -p <password do user> -k <password da keystore do user> -e <studentUser> [-c|-s|-b] {<filenames>}+");
             System.out.println("Usage for retrieving files:");
-            System.out.println("  java myCiencias -a <serverAddress> -e <studentUser> -g {<filenames>}+");
+            System.out.println("  java myCiencias -a <serverAddress> -e <studentUser> -p <password do user> -k <password da keystore do user> -g {<filenames>}+");
             System.exit(1);
         }
 
@@ -402,12 +441,16 @@ public class myCiencias {
         int serverPort = -1;
         String emitterUser = null;
         String studentUser = null;
+        String userPassword = null;
+        String keystorePassword = null;
         String operation = null;
         String[] filenames = null;
+        String newUsername = null;
+        String newPassword = null;
 
         // Find operation first
         for (int i = 0; i < args.length; i++) {
-            if (args[i].equals("-c") || args[i].equals("-s") || args[i].equals("-b") || args[i].equals("-g")) {
+            if (args[i].equals("-c") || args[i].equals("-s") || args[i].equals("-b") || args[i].equals("-g") || args[i].equals("-n")) {
                 operation = args[i];
                 break;
             }
@@ -450,6 +493,28 @@ public class myCiencias {
                     }
                     studentUser = args[++i];
                     break;
+                case "-p":
+                    if (i + 1 >= args.length) {
+                        System.out.println("Missing user password");
+                        System.exit(1);
+                    }
+                    userPassword = args[++i];
+                    break;
+                case "-k":
+                    if (i + 1 >= args.length) {
+                        System.out.println("Missing keystore password");
+                        System.exit(1);
+                    }
+                    keystorePassword = args[++i];
+                    break;
+                case "-n":
+                    if (i + 2 >= args.length) {
+                        System.out.println("Missing username and password for new user");
+                        System.exit(1);
+                    }
+                    newUsername = args[++i];
+                    newPassword = args[++i];
+                    break;
                 case "-c":
                 case "-s":
                 case "-b":
@@ -465,13 +530,31 @@ public class myCiencias {
             }
         }
 
-        // Validate required arguments
+        // Handle user creation
+        if (operation != null && operation.equals("-n")) {
+            if (newUsername == null || newPassword == null) {
+                System.out.println("Username and password are required for user creation");
+                System.exit(1);
+            }
+            createUser(serverHost, serverPort, newUsername, newPassword);
+            return;
+        }
+
+        // Validate required arguments for other operations
         if (serverHost == null || serverPort == -1) {
             System.out.println("Server address (-a) is required");
             System.exit(1);
         }
         if (studentUser == null) {
             System.out.println("Student user (-e) is required");
+            System.exit(1);
+        }
+        if (userPassword == null) {
+            System.out.println("User password (-p) is required");
+            System.exit(1);
+        }
+        if (keystorePassword == null) {
+            System.out.println("Keystore password (-k) is required");
             System.exit(1);
         }
         if (operation == null || filenames == null || filenames.length == 0) {
@@ -483,7 +566,7 @@ public class myCiencias {
             System.exit(1);
         }
 
-        myCiencias client = new myCiencias(serverHost, serverPort, emitterUser, studentUser);
+        myCiencias client = new myCiencias(serverHost, serverPort, emitterUser, studentUser, userPassword, keystorePassword);
 
         switch (operation) {
             case "-c":

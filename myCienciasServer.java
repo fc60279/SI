@@ -5,6 +5,11 @@ import java.util.concurrent.*;
 import java.util.logging.*;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
+import java.util.Scanner;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class myCienciasServer {
     private final int port;
@@ -13,13 +18,38 @@ public class myCienciasServer {
     private volatile boolean running;
     private ServerSocket serverSocket;
     private final String baseDirectory = "server_files";
+    private UserManager userManager = null;
 
     public myCienciasServer(int port) {
         this.port = port;
         this.executorService = Executors.newCachedThreadPool();
         this.logger = Logger.getLogger("myCienciasServer");
+        
         setupLogging();
         createBaseDirectory();
+        
+        // Ask for admin password
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("=== myCiencias Server ===");
+        System.out.println("Starting server with password file integrity verification.");
+        System.out.print("Enter admin password: ");
+        String adminPassword = scanner.nextLine();
+        
+        if (adminPassword.isEmpty()) {
+            System.out.println("Error: Admin password cannot be empty");
+            System.exit(1);
+        }
+        
+        try {
+            logger.info("Initializing user manager with password file integrity check");
+            this.userManager = new UserManager(adminPassword);
+            logger.info("User manager initialized successfully");
+            System.out.println("Password file integrity check passed. Server ready.");
+        } catch (Exception e) {
+            logger.severe("Error initializing user manager: " + e.getMessage());
+            System.err.println("Error initializing user manager: " + e.getMessage());
+            System.exit(1);
+        }
     }
 
     private void setupLogging() {
@@ -70,87 +100,210 @@ public class myCienciasServer {
     }
 
     private void handleClient(Socket clientSocket) {
-        try (
-            DataInputStream in = new DataInputStream(clientSocket.getInputStream());
-            DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream())
-        ) {
-            boolean clientConnected = true;
+        try (DataInputStream in = new DataInputStream(clientSocket.getInputStream());
+             DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream())) {
             
-            while (clientConnected && running) {
+            while (!clientSocket.isClosed() && clientSocket.isConnected()) {
                 try {
                     String command = in.readUTF();
                     logger.info("Received command: " + command);
                     
-                    String[] parts = command.split(":");
-                    switch (parts[0]) {
-                        case "GET_CERT":
-                            if (parts.length >= 2) {
-                                String user = parts[1];
-                                handleGetCertificate(user, out);
-                            }
-                            break;
-                        case "STORE_ENCRYPTED":
-                            if (parts.length >= 3) {
-                                String studentUser = parts[1];
-                                String filename = parts[2];
-                                handleStoreEncrypted(studentUser, filename, in, out);
-                            }
-                            break;
-                        case "STORE_SIGNED":
-                            if (parts.length >= 4) {
-                                String studentUser = parts[1];
-                                String filename = parts[2];
-                                String emitterUser = parts[3];
-                                handleStoreSigned(studentUser, filename, emitterUser, in, out);
-                            }
-                            break;
-                        case "STORE_SECURE":
-                            if (parts.length >= 4) {
-                                String studentUser = parts[1];
-                                String filename = parts[2];
-                                String emitterUser = parts[3];
-                                handleStoreSecure(studentUser, filename, emitterUser, in, out);
-                            }
-                            break;
-                        case "GET_FILE_INFO":
-                            if (parts.length >= 3) {
-                                String studentUser = parts[1];
-                                String filename = parts[2];
-                                handleGetFileInfo(studentUser, filename, out);
-                            } else {
-                                logger.severe("Invalid GET_FILE_INFO command: " + command);
-                                out.writeUTF("ERROR:Invalid command format");
-                            }
-                            break;
-                        case "DISCONNECT":
-                            clientConnected = false;
-                            break;
-                        default:
-                            logger.warning("Unknown command: " + command);
-                            out.writeUTF("ERROR:Unknown command");
+                    try {
+                        String[] parts = command.split(":");
+                        switch (parts[0]) {
+                            case "LOGIN":
+                                if (parts.length >= 3) {
+                                    String username = parts[1];
+                                    String password = parts[2];
+                                    if (userManager.authenticateUser(username, password)) {
+                                        out.writeUTF("SUCCESS:Login successful");
+                                    } else {
+                                        out.writeUTF("ERROR:Invalid credentials");
+                                    }
+                                }
+                                break;
+                                
+                            case "GET_CERTIFICATE":
+                                if (parts.length >= 2) {
+                                    String user = parts[1];
+                                    handleGetCertificate(user, out);
+                                }
+                                break;
+                                
+                            case "SEND_FILE":
+                                if (parts.length >= 4) {
+                                    String sender = parts[1];
+                                    String receiver = parts[2];
+                                    String filename = parts[3];
+                                    handleSendFile(sender, filename, in, out);
+                                }
+                                break;
+                                
+                            case "GET_FILE":
+                                if (parts.length >= 3) {
+                                    String user = parts[1];
+                                    String filename = parts[2];
+                                    handleGetFile(user, filename, out);
+                                }
+                                break;
+                                
+                            case "LIST_FILES":
+                                if (parts.length >= 2) {
+                                    String user = parts[1];
+                                    handleListFiles(user, out);
+                                }
+                                break;
+                                
+                            case "DELETE_FILE":
+                                if (parts.length >= 3) {
+                                    String user = parts[1];
+                                    String filename = parts[2];
+                                    handleDeleteFile(user, filename, out);
+                                }
+                                break;
+                                
+                            case "STORE_ENCRYPTED":
+                                if (parts.length >= 3) {
+                                    String studentUser = parts[1];
+                                    String filename = parts[2];
+                                    handleStoreEncrypted(studentUser, filename, in, out);
+                                }
+                                break;
+                                
+                            case "STORE_SIGNED":
+                                if (parts.length >= 4) {
+                                    String studentUser = parts[1];
+                                    String filename = parts[2];
+                                    String emitterUser = parts[3];
+                                    handleStoreSigned(studentUser, filename, emitterUser, in, out);
+                                }
+                                break;
+                                
+                            case "STORE_SECURE":
+                                if (parts.length >= 4) {
+                                    String studentUser = parts[1];
+                                    String filename = parts[2];
+                                    String emitterUser = parts[3];
+                                    handleStoreSecure(studentUser, filename, emitterUser, in, out);
+                                }
+                                break;
+                                
+                            case "GET_FILE_INFO":
+                                if (parts.length >= 3) {
+                                    String user = parts[1];
+                                    String filename = parts[2];
+                                    handleGetFileInfo(user, filename, out);
+                                }
+                                break;
+                                
+                            case "REGISTER":
+                                if (parts.length >= 3) {
+                                    String username = parts[1];
+                                    String password = parts[2];
+                                    handleRegisterUser(username, password, out);
+                                } else {
+                                    out.writeUTF("ERROR:Missing username or password");
+                                }
+                                break;
+                                
+                            default:
+                                out.writeUTF("ERROR:Unknown command");
+                        }
+                    } catch (Exception e) {
+                        logger.log(Level.SEVERE, "Error handling command: " + command, e);
+                        try {
+                            out.writeUTF("ERROR:" + e.getMessage());
+                        } catch (IOException ioe) {
+                            logger.log(Level.SEVERE, "Failed to send error message", ioe);
+                            break; // Exit the loop if we can't communicate with client
+                        }
                     }
-                } catch (EOFException | SocketException e) {
-                    // Client disconnected
-                    clientConnected = false;
+                } catch (EOFException e) {
+                    // Client has closed the connection, exit the loop gracefully
+                    logger.info("Client disconnected: " + clientSocket.getInetAddress());
+                    break;
+                } catch (IOException e) {
+                    // Other IO errors 
+                    logger.log(Level.WARNING, "IO error with client: " + clientSocket.getInetAddress(), e);
+                    break;
                 }
             }
-            
-            logger.info("Client disconnected");
-        } catch (Exception e) {
-            logger.severe("Error handling client: " + e.getMessage());
+        } catch (IOException e) {
+            // Errors during stream creation
+            logger.log(Level.WARNING, "Error setting up client connection", e);
+        } finally {
+            try {
+                if (!clientSocket.isClosed()) {
+                    clientSocket.close();
+                }
+            } catch (IOException e) {
+                logger.log(Level.WARNING, "Error closing client socket", e);
+            }
+            logger.info("Client handler finished for: " + clientSocket.getInetAddress());
         }
     }
 
-    private void handleGetCertificate(String username, DataOutputStream out) throws Exception {
+    private void handleGetCertificate(String user, DataOutputStream out) throws IOException {
         try {
-            KeyStore keystore = CryptoUtils.loadKeyStore(username, "123456");
-            X509Certificate cert = (X509Certificate) keystore.getCertificate(username);
-            String certB64 = Base64.getEncoder().encodeToString(cert.getEncoded());
-            out.writeUTF("SUCCESS:" + certB64);
-        } catch (Exception e) {
-            logger.severe("Error getting certificate for " + username + ": " + e.getMessage());
-            out.writeUTF("ERROR:" + e.getMessage());
+            String certPath = getCertificatePath(user);
+            File certFile = new File(certPath);
+            
+            if (!certFile.exists()) {
+                out.writeUTF("ERROR:Certificate not found for user: " + user);
+                return;
+            }
+            
+            byte[] certBytes = Files.readAllBytes(certFile.toPath());
+            String certBase64 = Base64.getEncoder().encodeToString(certBytes);
+            
+            out.writeUTF("SUCCESS:" + certBase64);
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Error handling certificate request", e);
+            out.writeUTF("ERROR:Failed to read certificate");
         }
+    }
+
+    private String getCertificatePath(String user) {
+        // Primeiro procura no diretório "certificates"
+        String certPath = "certificates/" + user + ".cer";
+        File certFile = new File(certPath);
+        if (certFile.exists()) {
+            return certPath;
+        }
+        
+        // Se não encontrar, procura no diretório atual
+        certPath = user + ".cer";
+        certFile = new File(certPath);
+        if (certFile.exists()) {
+            return certPath;
+        }
+        
+        // Se não encontrar, tenta exportar o certificado da keystore
+        try {
+            String keyStorePath = user + ".keystore";
+            if (new File(keyStorePath).exists()) {
+                logger.info("Exportando certificado de " + user + " da keystore");
+                ProcessBuilder pb = new ProcessBuilder(
+                    "keytool", 
+                    "-exportcert", 
+                    "-alias", user,
+                    "-file", certPath,
+                    "-keystore", keyStorePath,
+                    "-storepass", "123456"
+                );
+                Process p = pb.start();
+                int exitCode = p.waitFor();
+                if (exitCode == 0 && new File(certPath).exists()) {
+                    logger.info("Certificado exportado com sucesso para " + certPath);
+                    return certPath;
+                }
+            }
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Falha ao exportar certificado", e);
+        }
+        
+        // Retorna o caminho padrão, mesmo que o arquivo não exista
+        return "certificates/" + user + ".cer";
     }
 
     private void handleStoreEncrypted(String studentUser, String filename, DataInputStream in, DataOutputStream out) throws Exception {
@@ -390,6 +543,96 @@ public class myCienciasServer {
         }
     }
 
+    private void handleGetFile(String user, String filename, DataOutputStream out) throws IOException {
+        try {
+            File file = new File(getStudentDirectory(user) + File.separator + filename);
+            if (!file.exists()) {
+                out.writeUTF("ERROR:File not found");
+                return;
+            }
+            
+            byte[] fileBytes = Files.readAllBytes(file.toPath());
+            String fileBase64 = Base64.getEncoder().encodeToString(fileBytes);
+            
+            out.writeUTF("SUCCESS:" + fileBase64);
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Error handling file request", e);
+            out.writeUTF("ERROR:Failed to read file");
+        }
+    }
+
+    private void handleSendFile(String sender, String filename, DataInputStream in, DataOutputStream out) throws IOException {
+        try {
+            String fileBase64 = in.readUTF();
+            byte[] fileBytes = Base64.getDecoder().decode(fileBase64);
+            
+            String dir = getStudentDirectory(sender);
+            
+            File file = new File(dir, filename);
+            Files.write(file.toPath(), fileBytes);
+            
+            out.writeUTF("SUCCESS:File stored successfully");
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Error handling file storage", e);
+            out.writeUTF("ERROR:Failed to store file");
+        }
+    }
+
+    private void handleListFiles(String user, DataOutputStream out) throws IOException {
+        try {
+            File userDir = new File(getStudentDirectory(user));
+            if (!userDir.exists()) {
+                out.writeUTF("SUCCESS:[]");
+                return;
+            }
+            
+            File[] files = userDir.listFiles();
+            if (files == null) {
+                out.writeUTF("SUCCESS:[]");
+                return;
+            }
+            
+            List<String> fileList = Arrays.stream(files)
+                .map(File::getName)
+                .collect(Collectors.toList());
+            
+            String response = "SUCCESS:" + String.join(",", fileList);
+            out.writeUTF(response);
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Error listing files", e);
+            out.writeUTF("ERROR:Failed to list files");
+        }
+    }
+
+    private void handleDeleteFile(String user, String filename, DataOutputStream out) throws IOException {
+        try {
+            File file = new File(getStudentDirectory(user) + File.separator + filename);
+            if (!file.exists()) {
+                out.writeUTF("ERROR:File not found");
+                return;
+            }
+            
+            if (file.delete()) {
+                out.writeUTF("SUCCESS:File deleted successfully");
+            } else {
+                out.writeUTF("ERROR:Failed to delete file");
+            }
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Error deleting file", e);
+            out.writeUTF("ERROR:Failed to delete file");
+        }
+    }
+
+    private void handleRegisterUser(String username, String password, DataOutputStream out) throws Exception {
+        try {
+            userManager.registerUser(username, password);
+            out.writeUTF("SUCCESS:User registered successfully");
+        } catch (Exception e) {
+            logger.severe("Error registering user: " + e.getMessage());
+            out.writeUTF("ERROR:" + e.getMessage());
+        }
+    }
+
     public void shutdown() {
         running = false;
         try {
@@ -415,15 +658,33 @@ public class myCienciasServer {
             System.exit(1);
         }
 
-        int port = Integer.parseInt(args[0]);
-        myCienciasServer server = new myCienciasServer(port);
-        
-        // Add shutdown hook
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("\nShutting down server...");
-            server.shutdown();
-        }));
-        
-        server.start();
+        int port;
+        try {
+            port = Integer.parseInt(args[0]);
+        } catch (NumberFormatException e) {
+            System.out.println("Error: Port must be a valid number");
+            System.exit(1);
+            return; // Unreachable but needed for compilation
+        }
+
+        myCienciasServer server = null;
+        try {
+            server = new myCienciasServer(port);
+            
+            // Add shutdown hook
+            final myCienciasServer finalServer = server;
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                System.out.println("\nShutting down server...");
+                finalServer.shutdown();
+            }));
+            
+            server.start();
+        } catch (Exception e) {
+            System.err.println("Fatal error starting server: " + e.getMessage());
+            if (server != null) {
+                server.shutdown();
+            }
+            System.exit(1);
+        }
     }
 }

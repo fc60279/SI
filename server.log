@@ -1,0 +1,14 @@
+abr. 29, 2025 6:45:14 DA TARDE myCienciasServer <init>
+INFO: Initializing user manager with password file integrity check
+abr. 29, 2025 6:45:14 DA TARDE myCienciasServer <init>
+INFO: User manager initialized successfully
+abr. 29, 2025 6:45:14 DA TARDE myCienciasServer start
+INFO: Server started on port 23456
+abr. 29, 2025 6:45:22 DA TARDE myCienciasServer start
+INFO: New client connected from /127.0.0.1
+abr. 29, 2025 6:45:22 DA TARDE myCienciasServer handleClient
+INFO: Received command: REGISTER:Gui:123456
+abr. 29, 2025 6:45:22 DA TARDE myCienciasServer handleClient
+INFO: Client disconnected: /127.0.0.1
+abr. 29, 2025 6:45:22 DA TARDE myCienciasServer handleClient
+INFO: Client handler finished for: /127.0.0.1

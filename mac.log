@@ -1,0 +1,12 @@
+abr. 29, 2025 6:45:14 DA TARDE MACManager deriveKey
+INFO: Deriving MAC key from admin password
+abr. 29, 2025 6:45:14 DA TARDE MACManager loadMAC
+INFO: Loading MAC from file: users.mac
+abr. 29, 2025 6:45:14 DA TARDE MACManager loadMAC
+INFO: MAC loaded successfully
+abr. 29, 2025 6:45:14 DA TARDE MACManager verifyMAC
+INFO: MAC verification successful
+abr. 29, 2025 6:45:22 DA TARDE MACManager saveMAC
+INFO: Saving MAC to file: users.mac
+abr. 29, 2025 6:45:22 DA TARDE MACManager saveMAC
+INFO: MAC saved successfully

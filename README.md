@@ -42,42 +42,51 @@ java myCienciasServer 23456
 
 ## Uso do Cliente
 
-O cliente suporta quatro operações principais:
+O cliente suporta as seguintes operações:
 
-### 1. Cifrar e Enviar Ficheiros (-c)
+### Criar Novo Utilizador (-n)
 ```bash
-java myCiencias -a <serverAddress> -u <user do emissor> -e <user do estudante> -c <ficheiros>
+java myCiencias -a <serverAddress> -n <username> <password>
 ```
 Exemplo:
 ```bash
-java myCiencias -a 127.0.0.1:23456 -u silva -e maria -c declaracaoPasse.pdf declaracaoMatricula.pdf
+java myCiencias -a 127.0.0.1:23456 -n novouser minhasenha
+```
+
+### 1. Cifrar e Enviar Ficheiros (-c)
+```bash
+java myCiencias -a <serverAddress> -u <user do emissor> -p <password do user> -k <password da keystore do user> -e <user do estudante> -c <ficheiros>
+```
+Exemplo:
+```bash
+java myCiencias -a 127.0.0.1:23456 -u silva -p password123 -k keystore123 -e maria -c declaracaoPasse.pdf declaracaoMatricula.pdf
 ```
 
 ### 2. Assinar e Enviar Ficheiros (-s)
 ```bash
-java myCiencias -a <serverAddress> -u <user do emissor> -e <user do estudante> -s <ficheiros>
+java myCiencias -a <serverAddress> -u <user do emissor> -p <password do user> -k <password da keystore do user> -e <user do estudante> -s <ficheiros>
 ```
 Exemplo:
 ```bash
-java myCiencias -a 127.0.0.1:23456 -u silva -e maria -s declaracaoPasse.pdf declaracaoMatricula.pdf
+java myCiencias -a 127.0.0.1:23456 -u silva -p password123 -k keystore123 -e maria -s declaracaoPasse.pdf declaracaoMatricula.pdf
 ```
 
 ### 3. Assinar, Cifrar e Enviar Ficheiros (-b)
 ```bash
-java myCiencias -a <serverAddress> -u <user do emissor> -e <user do estudante> -b <ficheiros>
+java myCiencias -a <serverAddress> -u <user do emissor> -p <password do user> -k <password da keystore do user> -e <user do estudante> -b <ficheiros>
 ```
 Exemplo:
 ```bash
-java myCiencias -a 127.0.0.1:23456 -u silva -e maria -b declaracaoPasse.pdf declaracaoMatricula.pdf
+java myCiencias -a 127.0.0.1:23456 -u silva -p password -k keystore -e maria -b declaracaoPasse.pdf declaracaoMatricula.pdf
 ```
 
 ### 4. Receber e Verificar Ficheiros (-g)
 ```bash
-java myCiencias -a <serverAddress> -e <user do estudante> -g <ficheiros>
+java myCiencias -a <serverAddress> -e <user do estudante> -p <password do user> -k <password da keystore do user> -g <ficheiros>
 ```
 Exemplo:
 ```bash
-java myCiencias -a 127.0.0.1:23456 -e maria -g declaracaoPasse.pdf declaracaoMatricula.pdf
+java myCiencias -a 127.0.0.1:23456 -e maria -p password123 -k keystore123 -g declaracaoPasse.pdf declaracaoMatricula.pdf
 ```
 
 ## Estrutura de Ficheiros no Servidor
@@ -108,12 +117,3 @@ server_files/
 - Os certificados dos destinatários estão nas keystores dos emissores
 - Os ficheiros são verificados para unicidade no servidor
 - Os utilizadores padrão são: silva, maria, joao, ana 
-
-
-## IP
-
-
-- ip addr show
-- ip addr show | grep inet
-- hostname -I
-

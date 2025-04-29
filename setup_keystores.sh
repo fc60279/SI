@@ -3,6 +3,9 @@
 # Password for all keystores
 PASS=123456
 
+# Create certificates directory if it doesn't exist
+mkdir -p ../certificates
+
 # Create keystores for test users
 for user in silva maria joao ana; do
     # Generate key pair
@@ -23,6 +26,9 @@ for user in silva maria joao ana; do
         -file $user.cer \
         -keystore $user.keystore \
         -storepass $PASS
+        
+    # Copy certificate to the certificates directory
+    cp $user.cer ../certificates/
 done
 
 # Import certificates into each keystore
@@ -39,7 +45,7 @@ for user1 in silva maria joao ana; do
     done
 done
 
-# Clean up certificates
+# Clean up certificates in current directory (but keep them in the certificates directory)
 rm *.cer
 
-echo "Keystores created successfully!" 
+echo "Keystores and certificates created successfully!" 
